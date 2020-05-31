@@ -18,6 +18,6 @@ connect().then(db => app
     context: { db },
     graphiql: true
   }))
-  .listen(3000, () => {
+  .listen(port, () => {
     console.log('GraphQL listening on 3000')
   }));
