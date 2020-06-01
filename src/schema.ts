@@ -1,12 +1,7 @@
 import { GraphQLObjectType, GraphQLString, GraphQLInt, GraphQLNonNull, GraphQLList, GraphQLSchema } from "graphql";
 import { GraphQLDate } from 'graphql-iso-date';
 import { ObjectIdScalar } from './graphql-objectid';
-import { 
-  getGraphQLUpdateArgs, 
-  getMongoDbUpdateResolver, 
-  getGraphQLInsertType, 
-  getGraphQLFilterType, 
-  getMongoDbFilter } from "graphql-to-mongodb";
+import {  getGraphQLUpdateArgs, getMongoDbUpdateResolver, getGraphQLInsertType } from "graphql-to-mongodb";
 import { Db } from "mongodb";
 import * as util from "./schemaUtil";
 
