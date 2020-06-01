@@ -2,74 +2,16 @@ import { GraphQLObjectType, GraphQLString, GraphQLInt, GraphQLNonNull, GraphQLLi
 import { GraphQLDate } from 'graphql-iso-date';
 import { ObjectIdScalar } from './graphql-objectid';
 import { 
-  getGraphQLQueryArgs, 
-  getMongoDbQueryResolver, 
   getGraphQLUpdateArgs, 
   getMongoDbUpdateResolver, 
   getGraphQLInsertType, 
   getGraphQLFilterType, 
   getMongoDbFilter } from "graphql-to-mongodb";
-import { Collection, Db, ObjectId  } from "mongodb";
+import { Db } from "mongodb";
+import * as util from "./schemaUtil";
 
-const getMongoDbQueryField = (type: GraphQLObjectType, getCollection: (context: any) => Collection) => ({
-  type: new GraphQLList(type),
-  args: getGraphQLQueryArgs(type) as any,
-  resolve: getMongoDbQueryResolver(type,
-    async (filter, projection, options, obj, args, context) => {
-      return await getCollection(context).find(filter, { ...options, projection }).toArray();
-    })
-})
-
-const updDefault = (xx: GraphQLObjectType, col: string) => {
-  return {
-    type: GraphQLInt,
-    args: getGraphQLUpdateArgs(xx) as any,
-    resolve: getMongoDbUpdateResolver(xx,
-      async (filter, update, options, projection, obj, args, { db }: { db: Db }) => {
-        const result = await db.collection(col).updateMany(filter, update, options);
-        return result.modifiedCount;
-      }, {
-      differentOutputType: true,
-      validateUpdateArgs: true
-    })
-  }
-}
-
-const insDefault = (xx: GraphQLObjectType, col: string) => {
-  return {
-    type: new GraphQLList(xx),
-    args: { input: { type: getGraphQLInsertType(xx) } },
-    resolve: async (obj, args, { db }: { db: Db }) => {
-      const result = await db.collection(col).insertOne(args.input);
-      return result.ops;
-    }
-  }
-}
-
-const delDefault = (xx: GraphQLObjectType, col: string) => {
-  return {
-    type: GraphQLInt,
-    args: { filter: { type: new GraphQLNonNull(getGraphQLFilterType(xx)) } },
-    resolve: async (obj, args, { db }: { db: Db }) => {
-      const filter = getMongoDbFilter(xx, args.filter);
-      const result = await db.collection(col).deleteMany(filter)
-      return result.deletedCount;
-    }
-  }
-}
-
-const hasNoFkEntry = async (id: string, col: Collection) => {
-  const result = await col.find({ _id: { '$eq': new ObjectId(id) } }).toArray();
-  return result.length === 0 ? true : false;
-}
-
-const idExists = async (id: Int16Array, px: string, col: Collection) => {
-  const result = await col.find({ id: { '$eq': id }, px: { '$eq': px}}).toArray();
-  return result.length > 0 ? true : false;
-}
-
-const Px = new GraphQLObjectType({
-  name: 'Px',
+const Pts = new GraphQLObjectType({
+  name: 'Pts',
   fields: () => ({
     _id: { type: ObjectIdScalar},
     birthdate: { type: new GraphQLNonNull(GraphQLDate) },
@@ -80,8 +22,8 @@ const Px = new GraphQLObjectType({
   })
 })
 
-const Dx = new GraphQLObjectType({
-  name: 'Dx',
+const Drs = new GraphQLObjectType({
+  name: 'Drs',
   fields: () => ({
     _id: { type: ObjectIdScalar },
     specialization: { type: new GraphQLNonNull(GraphQLString) },
@@ -91,12 +33,12 @@ const Dx = new GraphQLObjectType({
   })
 })
 
-const Cx = new GraphQLObjectType({
-  name: 'Cx',
+const Cases = new GraphQLObjectType({
+  name: 'Cases',
   fields: () => ({
     _id: { type: ObjectIdScalar },
     id: { type: new GraphQLNonNull(GraphQLInt) },
-    px: { type: new GraphQLNonNull(GraphQLString) },
+    pt: { type: new GraphQLNonNull(GraphQLString) },
     surgeon: { type: GraphQLString },
     firstassist: { type: GraphQLString },
     prediag: { type: new GraphQLNonNull(GraphQLString) },
@@ -110,82 +52,88 @@ const Cx = new GraphQLObjectType({
 const QueryType = new GraphQLObjectType({
   name: 'QueryType',
   fields: () => ({
-    px: getMongoDbQueryField(Px, ({ db }: { db: Db }) => db.collection('pxes')),
-    cx: getMongoDbQueryField(Cx, ({ db }: { db: Db }) => db.collection('cxes')),
-    dx: getMongoDbQueryField(Dx, ({ db }: { db: Db }) => db.collection('dxes')),
+    pts: util.getMongoDbQueryField(Pts, ({ db }: { db: Db }) => db.collection('patients')),
+    cases: util.getMongoDbQueryField(Cases, ({ db }: { db: Db }) => db.collection('cases')),
+    drs: util.getMongoDbQueryField(Drs, ({ db }: { db: Db }) => db.collection('doctors')),
   })
 })
 
 const MutationType = new GraphQLObjectType({
   name: 'MutationType',
   fields: () => ({
-    insertPx: insDefault(Px, 'pxes'),
-    updatePxes: updDefault(Px, 'pxes'),
-    deletePxes: delDefault(Px, 'pxes'),
-    insertDx: insDefault(Dx, 'dxes'),
-    updateDxes: updDefault(Dx, 'dxes'),
-    deleteDxes: delDefault(Dx, 'dxes'),
-    insertCx: {
-      type: new GraphQLList(Cx),
-      args: { input: { type: getGraphQLInsertType(Cx) } },
+    insertPt: util.insDefault(Pts, 'patients'),
+    updatePts: util.updDefault(Pts, 'patients'),
+    deletePts: util.delDefault(Pts, 'patients'),
+    insertDr: util.insDefault(Drs, 'doctors'),
+    updateDrs: util.updDefault(Drs, 'doctors'),
+    deleteDrs: util.delDefault(Drs, 'doctors'),
+    insertCase: {
+      type: new GraphQLList(Cases),
+      args: { input: { type: getGraphQLInsertType(Cases) } },
       resolve: async (obj, args, { db }: { db: Db }) => {
         
-        if (await hasNoFkEntry(args.input.px, db.collection('pxes'))) {
-          return null;
+        if (await util.hasNoFkEntry(args.input.px, db.collection('patients'))) {
+          throw new Error(
+            "Pt does not exist."
+          );
         }
 
-        if (await idExists(args.input.id, args.input.px, db.collection('cxes'))) {
-          return null;
+        if (await util.idExists(args.input.id, args.input.px, db.collection('cases'))) {
+          throw new Error(
+            "Case Id exists already."
+          );
         }
 
-        if (args.input.surgeon && await hasNoFkEntry(args.input.surgeon, db.collection('dxes'))) {
-          return null;
+        if (args.input.surgeon && await util.hasNoFkEntry(args.input.surgeon, db.collection('doctors'))) {
+          throw new Error(
+            "Dr does not exist."
+          );
         }
 
-        if (args.input.firstassist && await hasNoFkEntry(args.input.firstassist, db.collection('dxes'))) {
-          return null;
+        if (args.input.firstassist && await util.hasNoFkEntry(args.input.firstassist, db.collection('doctors'))) {
+          throw new Error(
+            "Dr does not exist."
+          );
         }
 
         const result = await db.collection('cxes').insertOne(args.input);
         return result.ops;
       }
     },
-    updateCxes: {
+    updateCases: {
       type: GraphQLInt,
-      args: getGraphQLUpdateArgs(Cx) as any,
-      resolve: getMongoDbUpdateResolver(Cx,
+      args: getGraphQLUpdateArgs(Cases) as any,
+      resolve: getMongoDbUpdateResolver(Cases,
         async (filter, update, options, projection, obj, args, { db }: { db: Db }) => {
-          if (update.$set.hasOwnProperty('px')) {
-            if (await hasNoFkEntry(update.$set.px, db.collection('pxes'))) {
-              return null;
+          if (update.$set.hasOwnProperty('pt')) {
+            if (await util.hasNoFkEntry(update.$set.px, db.collection('patients'))) {
+              throw new Error(
+                "Pt does not exist."
+              );
             }
           }
           if (update.$set.hasOwnProperty('surgeon')) {
-            if (await hasNoFkEntry(update.$set.surgeon, db.collection('dxes'))) {
-              return null;
+            if (await util.hasNoFkEntry(update.$set.surgeon, db.collection('doctors'))) {
+              throw new Error(
+                "Dr does not exist."
+              );
             }
           }
           if (update.$set.hasOwnProperty('firstassist')) {
-            if (await hasNoFkEntry(update.$set.firstassist, db.collection('dxes'))) {
-              return null;
+            if (await util.hasNoFkEntry(update.$set.firstassist, db.collection('doctors'))) {
+              throw new Error(
+                "Dr does not exist."
+              );
             }
           }
-          const result = await db.collection('cxes').updateMany(filter, update, options);
+          const result = await db.collection('cases').updateMany(filter, update, options);
           return result.modifiedCount;
         }, {
         differentOutputType: true,
         validateUpdateArgs: true
       })
     },
-    deleteCxes: {
-      type: GraphQLInt,
-      args: { filter: { type: new GraphQLNonNull(getGraphQLFilterType(Cx)) } },
-      resolve: async (obj, args, { db }: { db: Db }) => {
-        const filter = getMongoDbFilter(Cx, args.filter);
-        const result = await db.collection('cxes').deleteMany(filter)
-        return result.deletedCount;
-      }
-    }
+    deleteCases: util.delDefault(Cases, 'cases'),
   })
 })
 
