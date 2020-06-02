@@ -1,0 +1,48 @@
+POST http://localhost:3000/login
+Content-Type: application/json
+
+{
+  "username": "drdoom",
+  "password": "hampelmann"
+}
+
+###
+
+POST http://localhost:3000/login/create
+Content-Type: application/json
+
+{
+  "_id": "5ed60a5fe161d64f84b4da20",
+  "name": "Evil",
+  "firstname": "Peter",
+  "username": "drevil",
+  "password": "hampelmann"
+}
+
+###
+
+POST http://localhost:3000/login/changepw
+Content-Type: application/json
+
+{
+  "_id": "5ed60a5fe161d64f84b4da21",
+  "password": "hampelfrau"
+}
+
+###
+
+POST http://localhost:3000/login
+Content-Type: application/json
+
+{
+  "username": "drdoom",
+  "password": "hampelfrau"
+}
+
+###
+
+POST http://localhost:3000/logout
+Content-Type: application/json
+
+{
+  "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6MSwidXNlcm5hbWUiOiJkcmRvb20iLCJpYXQiOjE1OTEwOTYwNjd9.WaO5IVyHI2O3LvK6KcdnHoeF-vtD3r_TvRfyiwqvURg"}
