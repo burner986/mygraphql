@@ -17,7 +17,7 @@
     "graphql": "^15.0.0",
     "graphql-iso-date": "^3.6.1",
     "graphql-to-mongodb": "^1.6.5",
-    "i": "^0.3.6",
+    "i": "^0.3.7",
     "jsonwebtoken": "^8.5.1",
     "mongodb": "^3.5.8"
   },
